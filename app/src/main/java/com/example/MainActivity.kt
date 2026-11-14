@@ -9,7 +9,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -22,8 +24,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Alarm
@@ -33,8 +37,10 @@ import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -42,26 +48,42 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.credentials.CredentialManager
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.audio.StudySoundPlayer
+import com.example.auth.authStateFlow
+import com.example.auth.signOut
+import com.example.data.remote.FirestoreStudyRepository
 import com.example.model.StudyTab
 import com.example.ui.StudyPulseUiState
 import com.example.ui.StudyPulseViewModel
+import com.example.ui.components.AccountProfileDialog
 import com.example.ui.components.AlarmRingDialog
 import com.example.ui.components.CelebrationOverlay
 import com.example.ui.components.StreamAndSubjectSelectorCard
 import com.example.ui.components.StudyPulseTopBar
 import com.example.ui.components.TaskEditorDialog
 import com.example.ui.screens.AlarmsSection
+import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.CalendarSection
 import com.example.ui.screens.DashboardSection
 import com.example.ui.screens.GoalsSection
@@ -70,8 +92,12 @@ import com.example.ui.theme.MidnightHeader
 import com.example.ui.theme.PulseBlue
 import com.example.ui.theme.PulseBlueLight
 import com.example.ui.theme.PulsePurple
+import com.example.ui.theme.PulseRose
 import com.example.ui.theme.StudyPulseTheme
 import com.example.ui.theme.TextMuted
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
+import com.google.firebase.firestore.FirebaseFirestore
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,19 +108,91 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             StudyPulseTheme {
-                StudyPulseApp()
+                StudyPulseAuthGate()
             }
         }
     }
 }
 
 @Composable
+fun StudyPulseAuthGate() {
+    val auth = Firebase.auth
+    val currentUser by auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
+    val user = currentUser
+
+    if (user == null) {
+        AuthScreen(
+            onAuthSuccess = { /* authStateFlow updates reactively */ }
+        )
+    } else {
+        key(user.uid) {
+            AuthenticatedStudyPulseApp(
+                currentUserId = user.uid,
+                initialDisplayName = user.displayName,
+                initialEmail = user.email
+            )
+        }
+    }
+}
+
+@Composable
+private fun AuthenticatedStudyPulseApp(
+    currentUserId: String,
+    initialDisplayName: String?,
+    initialEmail: String?
+) {
+    val viewModel: StudyPulseViewModel = viewModel(
+        key = currentUserId,
+        factory = viewModelFactory {
+            initializer {
+                val app = checkNotNull(this[APPLICATION_KEY]) {
+                    "APPLICATION_KEY missing from CreationExtras"
+                }
+                val databaseId = app.getString(R.string.firestore_database_id)
+                val db = FirebaseFirestore.getInstance(databaseId)
+                val repository = FirestoreStudyRepository(db)
+                val soundPlayer = StudySoundPlayer(app)
+                StudyPulseViewModel(
+                    repository = repository,
+                    soundPlayer = soundPlayer,
+                    currentUserId = currentUserId,
+                    initialDisplayName = initialDisplayName,
+                    initialEmail = initialEmail
+                )
+            }
+        }
+    )
+
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val credentialManager = remember(context) { CredentialManager.create(context) }
+
+    val handleSignOut: () -> Unit = {
+        viewModel.closeAccountDialog()
+        signOut(
+            credentialManager = credentialManager,
+            scope = coroutineScope
+        )
+    }
+
+    StudyPulseApp(
+        viewModel = viewModel,
+        onSignOut = handleSignOut
+    )
+}
+
+@Composable
 fun StudyPulseApp(
-    viewModel: StudyPulseViewModel = viewModel()
+    viewModel: StudyPulseViewModel,
+    onSignOut: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    if (uiState.currentTab != StudyTab.DASHBOARD && !uiState.isTaskModalOpen && uiState.ringingTask == null) {
+    if (uiState.currentTab != StudyTab.DASHBOARD &&
+        !uiState.isTaskModalOpen &&
+        uiState.ringingTask == null &&
+        !uiState.isAccountDialogOpen
+    ) {
         BackHandler {
             viewModel.selectTab(StudyTab.DASHBOARD)
         }
@@ -128,13 +226,15 @@ fun StudyPulseApp(
                         StudyPulseTopBar(
                             headerDate = uiState.headerDateDisplay,
                             streakDays = uiState.preferences.streak,
-                            onTestAlarmClick = viewModel::triggerTestAlarm
+                            onTestAlarmClick = viewModel::triggerTestAlarm,
+                            onAccountClick = viewModel::openAccountDialog
                         )
                     }
                 ) { innerPadding ->
                     MainScrollableBody(
                         uiState = uiState,
                         viewModel = viewModel,
+                        onSignOut = onSignOut,
                         modifier = Modifier
                             .padding(innerPadding)
                             .navigationBarsPadding()
@@ -149,7 +249,8 @@ fun StudyPulseApp(
                     StudyPulseTopBar(
                         headerDate = uiState.headerDateDisplay,
                         streakDays = uiState.preferences.streak,
-                        onTestAlarmClick = viewModel::triggerTestAlarm
+                        onTestAlarmClick = viewModel::triggerTestAlarm,
+                        onAccountClick = viewModel::openAccountDialog
                     )
                 },
                 bottomBar = {
@@ -162,6 +263,7 @@ fun StudyPulseApp(
                 MainScrollableBody(
                     uiState = uiState,
                     viewModel = viewModel,
+                    onSignOut = onSignOut,
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -171,6 +273,16 @@ fun StudyPulseApp(
             celebrationTitle = uiState.celebrationTitle,
             celebrationNonce = uiState.celebrationNonce,
             onBannerFinished = viewModel::clearCelebrationBanner
+        )
+    }
+
+    if (uiState.isAccountDialogOpen) {
+        AccountProfileDialog(
+            displayName = uiState.accountDisplayName,
+            email = uiState.accountEmail,
+            streamLabel = uiState.preferences.selectedStream.batchName,
+            onSignOut = onSignOut,
+            onDismiss = viewModel::closeAccountDialog
         )
     }
 
@@ -201,6 +313,7 @@ fun StudyPulseApp(
 private fun MainScrollableBody(
     uiState: StudyPulseUiState,
     viewModel: StudyPulseViewModel,
+    onSignOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -214,6 +327,45 @@ private fun MainScrollableBody(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
+            if (!uiState.syncErrorMessage.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = PulseRose.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, PulseRose.copy(alpha = 0.45f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                        .testTag("sync_error_banner")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.ErrorOutline,
+                                contentDescription = null,
+                                tint = PulseRose,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = uiState.syncErrorMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFFDA4AF)
+                            )
+                        }
+                        TextButton(onClick = viewModel::clearSyncError) {
+                            Text("Dismiss", color = Color(0xFFFDA4AF))
+                        }
+                    }
+                }
+            }
+
             StreamAndSubjectSelectorCard(
                 selectedStream = uiState.preferences.selectedStream,
                 selectedSubjectFilter = uiState.preferences.selectedSubjectFilter,
@@ -259,7 +411,8 @@ private fun MainScrollableBody(
                         onSelectAlarmTone = viewModel::selectAlarmTone,
                         onToggleTask = viewModel::toggleTaskCompleted,
                         onEditTask = viewModel::openEditTaskModal,
-                        onDeleteTask = viewModel::deleteTask
+                        onDeleteTask = viewModel::deleteTask,
+                        onSignOut = onSignOut
                     )
                 }
             }

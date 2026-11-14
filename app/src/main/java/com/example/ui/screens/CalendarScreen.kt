@@ -14,11 +14,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.WorkspacePremium
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,7 +63,9 @@ import com.example.ui.theme.MidnightSurfaceHigh
 import com.example.ui.theme.PulseBlue
 import com.example.ui.theme.PulseBlueLight
 import com.example.ui.theme.PulseBlueSoft
+import com.example.ui.theme.PulseEmerald
 import com.example.ui.theme.PulseGold
+import com.example.ui.theme.PulseRose
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -75,7 +82,8 @@ fun CalendarSection(
     onSelectAlarmTone: (AlarmTone) -> Unit,
     onToggleTask: (StudyTask) -> Unit,
     onEditTask: (StudyTask) -> Unit,
-    onDeleteTask: (String) -> Unit
+    onDeleteTask: (String) -> Unit,
+    onSignOut: () -> Unit
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     val today = remember { DateTimeHelper.todayString() }
@@ -309,6 +317,103 @@ fun CalendarSection(
                         style = MaterialTheme.typography.bodySmall,
                         color = TextMuted,
                         textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        // Student Account & Cloud Sync Card
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MidnightSurface.copy(alpha = 0.94f),
+            border = BorderStroke(1.dp, CardBorderBlue)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.AccountCircle,
+                            contentDescription = null,
+                            tint = PulseBlueLight,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Column {
+                            Text(
+                                text = uiState.accountDisplayName,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            if (!uiState.accountEmail.isNullOrBlank()) {
+                                Text(
+                                    text = uiState.accountEmail,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextMuted
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = PulseEmerald.copy(alpha = 0.16f),
+                        border = BorderStroke(1.dp, PulseEmerald.copy(alpha = 0.35f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.CloudDone,
+                                contentDescription = null,
+                                tint = PulseEmerald,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Synced",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = PulseEmerald
+                            )
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = onSignOut,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PulseRose.copy(alpha = 0.18f),
+                        contentColor = Color(0xFFFDA4AF)
+                    ),
+                    border = BorderStroke(1.dp, PulseRose.copy(alpha = 0.45f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("sign_out_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.Logout,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(
+                        text = "Sign Out",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }

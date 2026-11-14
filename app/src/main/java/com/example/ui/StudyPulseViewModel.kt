@@ -1,12 +1,10 @@
 package com.example.ui
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import android.util.Log
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.audio.StudySoundPlayer
-import com.example.data.local.StudyPreferencesStore
-import com.example.data.local.StudyPulseDatabase
-import com.example.data.local.StudyPulseRepository
+import com.example.data.remote.FirestoreStudyRepository
 import com.example.model.AlarmTone
 import com.example.model.ChapterGoal
 import com.example.model.DateTimeHelper
@@ -19,10 +17,13 @@ import com.example.model.StudyStream
 import com.example.model.StudyTab
 import com.example.model.StudyTask
 import com.example.model.TaskFilter
+import com.google.firebase.firestore.FirebaseFirestoreException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -40,11 +41,17 @@ data class EphemeralUiState(
     val editingTask: StudyTask? = null,
     val ringingTask: StudyTask? = null,
     val celebrationTitle: String? = null,
-    val celebrationNonce: Long = 0L
+    val celebrationNonce: Long = 0L,
+    val isAccountDialogOpen: Boolean = false,
+    val syncErrorMessage: String? = null
 )
 
 data class StudyPulseUiState(
     val preferences: StudyPreferences = StudyPreferences(),
+    val accountDisplayName: String = "Student",
+    val accountEmail: String? = null,
+    val isSyncingCloud: Boolean = true,
+    val syncErrorMessage: String? = null,
     val allTasks: List<StudyTask> = emptyList(),
     val todayTasks: List<StudyTask> = emptyList(),
     val filteredAllTasks: List<StudyTask> = emptyList(),
@@ -64,24 +71,71 @@ data class StudyPulseUiState(
     val editingTask: StudyTask? = null,
     val ringingTask: StudyTask? = null,
     val celebrationTitle: String? = null,
-    val celebrationNonce: Long = 0L
+    val celebrationNonce: Long = 0L,
+    val isAccountDialogOpen: Boolean = false
 )
 
-class StudyPulseViewModel(application: Application) : AndroidViewModel(application) {
+class StudyPulseViewModel(
+    private val repository: FirestoreStudyRepository,
+    private val soundPlayer: StudySoundPlayer,
+    private val currentUserId: String,
+    private val initialDisplayName: String?,
+    private val initialEmail: String?
+) : ViewModel() {
 
-    private val repository = StudyPulseRepository(
-        dao = StudyPulseDatabase.getInstance(application).studyDao(),
-        preferencesStore = StudyPreferencesStore(application)
-    )
-    private val soundPlayer = StudySoundPlayer(application)
     private val ephemeral = MutableStateFlow(EphemeralUiState())
 
+    private fun unwrapRootError(error: Throwable): Throwable? {
+        val firestoreError = generateSequence(error) { it.cause }
+            .filterIsInstance<FirebaseFirestoreException>()
+            .firstOrNull()
+        if (firestoreError == null && error is CancellationException) return null
+        return firestoreError ?: error
+    }
+
+    private val profileFlow = repository.observeUserProfile(currentUserId)
+        .catch { error ->
+            val root = unwrapRootError(error) ?: throw error
+            Log.w(TAG, "Error observing user profile", root)
+            ephemeral.update {
+                it.copy(syncErrorMessage = root.localizedMessage ?: "Failed to sync profile")
+            }
+            emit(null)
+        }
+
+    private val tasksFlow = repository.observeTasks(currentUserId)
+        .catch { error ->
+            val root = unwrapRootError(error) ?: throw error
+            Log.w(TAG, "Error observing study tasks", root)
+            ephemeral.update {
+                it.copy(syncErrorMessage = root.localizedMessage ?: "Failed to sync tasks")
+            }
+            emit(emptyList())
+        }
+
+    private val goalsFlow = repository.observeGoals(currentUserId)
+        .catch { error ->
+            val root = unwrapRootError(error) ?: throw error
+            Log.w(TAG, "Error observing chapter goals", root)
+            ephemeral.update {
+                it.copy(syncErrorMessage = root.localizedMessage ?: "Failed to sync goals")
+            }
+            emit(emptyList())
+        }
+
     val uiState: StateFlow<StudyPulseUiState> = combine(
-        repository.preferencesFlow,
-        repository.tasksFlow,
-        repository.goalsFlow,
+        profileFlow,
+        tasksFlow,
+        goalsFlow,
         ephemeral
-    ) { prefs, tasks, goals, eph ->
+    ) { profile, tasks, goals, eph ->
+        val prefs = profile?.toPreferences() ?: StudyPreferences()
+        val displayName = profile?.displayName?.ifBlank { null }
+            ?: initialDisplayName?.ifBlank { null }
+            ?: initialEmail?.substringBefore("@")?.ifBlank { null }
+            ?: "Student"
+        val email = profile?.email ?: initialEmail
+
         val today = DateTimeHelper.todayString()
         val subjectFilter = prefs.selectedSubjectFilter
 
@@ -115,11 +169,15 @@ class StudyPulseViewModel(application: Application) : AndroidViewModel(applicati
 
         StudyPulseUiState(
             preferences = prefs,
+            accountDisplayName = displayName,
+            accountEmail = email,
+            isSyncingCloud = profile == null,
+            syncErrorMessage = eph.syncErrorMessage,
             allTasks = tasks,
             todayTasks = todayFiltered,
             filteredAllTasks = alarmsFiltered,
             calendarTasks = calTasks,
-            goals = goals,
+            goals = goals.sortedByDescending { it.createdAt },
             todayTotalCount = todayTotal,
             todayDoneCount = todayDone,
             todayPendingCount = todayPending,
@@ -134,17 +192,32 @@ class StudyPulseViewModel(application: Application) : AndroidViewModel(applicati
             editingTask = eph.editingTask,
             ringingTask = eph.ringingTask,
             celebrationTitle = eph.celebrationTitle,
-            celebrationNonce = eph.celebrationNonce
+            celebrationNonce = eph.celebrationNonce,
+            isAccountDialogOpen = eph.isAccountDialogOpen
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000L),
-        initialValue = StudyPulseUiState()
+        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+        initialValue = StudyPulseUiState(
+            accountDisplayName = initialDisplayName ?: "Student",
+            accountEmail = initialEmail
+        )
     )
 
     init {
         viewModelScope.launch {
-            repository.ensureSeeded()
+            runCatching {
+                repository.ensureUserInitialized(
+                    displayName = initialDisplayName,
+                    email = initialEmail
+                )
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                Log.w(TAG, "Cloud profile initialization failed", error)
+                ephemeral.update {
+                    it.copy(syncErrorMessage = error.localizedMessage ?: "Failed to initialize cloud profile")
+                }
+            }
         }
         startClockTicker()
     }
@@ -171,7 +244,7 @@ class StudyPulseViewModel(application: Application) : AndroidViewModel(applicati
                     }
                     if (dueTask != null) {
                         val stamped = dueTask.copy(firedKey = stamp)
-                        repository.saveTask(stamped)
+                        runCatching { repository.updateTask(stamped) }
                         triggerAlarm(stamped, currentState.preferences.alarmTone)
                     }
                 }
@@ -184,14 +257,26 @@ class StudyPulseViewModel(application: Application) : AndroidViewModel(applicati
         ephemeral.update { it.copy(currentTab = tab) }
     }
 
+    fun openAccountDialog() {
+        ephemeral.update { it.copy(isAccountDialogOpen = true) }
+    }
+
+    fun closeAccountDialog() {
+        ephemeral.update { it.copy(isAccountDialogOpen = false) }
+    }
+
+    fun clearSyncError() {
+        ephemeral.update { it.copy(syncErrorMessage = null) }
+    }
+
     fun selectStream(stream: StudyStream) {
-        viewModelScope.launch {
+        launchWrite("Failed to update exam stream") {
             repository.setSelectedStream(stream)
         }
     }
 
     fun selectSubjectFilter(subject: String) {
-        viewModelScope.launch {
+        launchWrite("Failed to update subject filter") {
             repository.setSelectedSubjectFilter(subject)
         }
     }
@@ -227,32 +312,33 @@ class StudyPulseViewModel(application: Application) : AndroidViewModel(applicati
         val cleanTitle = title.trim()
         if (cleanTitle.isEmpty()) return
         val existing = ephemeral.value.editingTask
-        val payload = if (existing != null) {
-            existing.copy(
-                title = cleanTitle,
-                subject = subject,
-                date = date.ifBlank { DateTimeHelper.todayString() },
-                time = time.ifBlank { "10:00" },
-                repeatMode = repeatMode,
-                notes = notes.trim(),
-                firedKey = ""
-            )
-        } else {
-            StudyTask(
-                id = "t_${System.currentTimeMillis()}",
-                title = cleanTitle,
-                subject = subject,
-                date = date.ifBlank { DateTimeHelper.todayString() },
-                time = time.ifBlank { "10:00" },
-                repeatMode = repeatMode,
-                notes = notes.trim(),
-                completed = false,
-                celebrated = false,
-                firedKey = ""
-            )
-        }
-        viewModelScope.launch {
-            repository.saveTask(payload)
+        launchWrite("Failed to save study session") {
+            if (existing != null) {
+                val updated = existing.copy(
+                    title = cleanTitle,
+                    subject = subject,
+                    date = date.ifBlank { DateTimeHelper.todayString() },
+                    time = time.ifBlank { "10:00" },
+                    repeatMode = repeatMode,
+                    notes = notes.trim(),
+                    firedKey = ""
+                )
+                repository.updateTask(updated)
+            } else {
+                val created = StudyTask(
+                    id = "t_${System.currentTimeMillis()}",
+                    title = cleanTitle,
+                    subject = subject,
+                    date = date.ifBlank { DateTimeHelper.todayString() },
+                    time = time.ifBlank { "10:00" },
+                    repeatMode = repeatMode,
+                    notes = notes.trim(),
+                    completed = false,
+                    celebrated = false,
+                    firedKey = ""
+                )
+                repository.createTask(created)
+            }
             closeTaskModal()
         }
     }
@@ -264,8 +350,8 @@ class StudyPulseViewModel(application: Application) : AndroidViewModel(applicati
             completed = nowCompleted,
             celebrated = if (shouldCelebrate) true else task.celebrated
         )
-        viewModelScope.launch {
-            repository.saveTask(updated)
+        launchWrite("Failed to update session status") {
+            repository.updateTask(updated)
             if (shouldCelebrate) {
                 fireCelebration(task.title)
             }
@@ -273,7 +359,7 @@ class StudyPulseViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun deleteTask(taskId: String) {
-        viewModelScope.launch {
+        launchWrite("Failed to delete session") {
             repository.deleteTask(taskId)
         }
     }
@@ -289,8 +375,8 @@ class StudyPulseViewModel(application: Application) : AndroidViewModel(applicati
             done = false,
             celebrated = false
         )
-        viewModelScope.launch {
-            repository.saveGoal(goal)
+        launchWrite("Failed to save chapter goal") {
+            repository.createGoal(goal)
         }
     }
 
@@ -301,8 +387,8 @@ class StudyPulseViewModel(application: Application) : AndroidViewModel(applicati
             done = nowDone,
             celebrated = if (shouldCelebrate) true else goal.celebrated
         )
-        viewModelScope.launch {
-            repository.saveGoal(updated)
+        launchWrite("Failed to update goal status") {
+            repository.updateGoal(updated)
             if (shouldCelebrate) {
                 fireCelebration(goal.title)
             }
@@ -310,31 +396,32 @@ class StudyPulseViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun deleteGoal(goalId: String) {
-        viewModelScope.launch {
+        launchWrite("Failed to delete goal") {
             repository.deleteGoal(goalId)
         }
     }
 
     fun updateTargetLectures(count: Int) {
-        viewModelScope.launch {
+        launchWrite("Failed to update lecture target") {
             repository.setDailyTargetLectures(count)
         }
     }
 
     fun updateTargetHours(hours: Int) {
-        viewModelScope.launch {
+        launchWrite("Failed to update hours target") {
             repository.setDailyTargetHours(hours)
         }
     }
 
     fun adjustLoggedHours(delta: Float) {
-        viewModelScope.launch {
-            repository.adjustLoggedHours(delta)
+        val currentHours = uiState.value.preferences.loggedHoursToday
+        launchWrite("Failed to update logged hours") {
+            repository.adjustLoggedHours(currentHours, delta)
         }
     }
 
     fun selectAlarmTone(tone: AlarmTone) {
-        viewModelScope.launch {
+        launchWrite("Failed to update alarm tone") {
             repository.setAlarmTone(tone)
             soundPlayer.previewTone(tone)
         }
@@ -380,8 +467,8 @@ class StudyPulseViewModel(application: Application) : AndroidViewModel(applicati
         dismissRingingAlarm()
         if (ringing != null && ringing.id != "test") {
             val newTime = DateTimeHelper.snoozeTimeHM(minutes)
-            viewModelScope.launch {
-                repository.saveTask(ringing.copy(time = newTime, firedKey = ""))
+            launchWrite("Failed to snooze alarm") {
+                repository.updateTask(ringing.copy(time = newTime, firedKey = ""))
             }
         }
     }
@@ -405,8 +492,25 @@ class StudyPulseViewModel(application: Application) : AndroidViewModel(applicati
         ephemeral.update { it.copy(celebrationTitle = null) }
     }
 
+    private fun launchWrite(fallbackMsg: String, block: suspend () -> Unit) {
+        viewModelScope.launch {
+            runCatching { block() }.onFailure { error ->
+                if (error is CancellationException) throw error
+                Log.w(TAG, fallbackMsg, error)
+                ephemeral.update {
+                    it.copy(syncErrorMessage = error.localizedMessage ?: fallbackMsg)
+                }
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         soundPlayer.stopAlarm()
+    }
+
+    private companion object {
+        const val TAG = "StudyPulseVM"
+        const val STOP_TIMEOUT_MILLIS = 5_000L
     }
 }

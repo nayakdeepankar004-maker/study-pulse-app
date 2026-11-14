@@ -20,15 +20,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.School
-import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -57,10 +64,12 @@ import com.example.ui.theme.PulseAmber
 import com.example.ui.theme.PulseBlue
 import com.example.ui.theme.PulseBlueLight
 import com.example.ui.theme.PulseBlueSoft
+import com.example.ui.theme.PulseEmerald
 import com.example.ui.theme.PulseGold
 import com.example.ui.theme.PulsePurple
 import com.example.ui.theme.PulsePurpleLight
 import com.example.ui.theme.PulsePurpleSoft
+import com.example.ui.theme.PulseRose
 import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
@@ -71,6 +80,7 @@ fun StudyPulseTopBar(
     headerDate: String,
     streakDays: Int,
     onTestAlarmClick: () -> Unit,
+    onAccountClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -82,7 +92,7 @@ fun StudyPulseTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -92,7 +102,7 @@ fun StudyPulseTopBar(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(38.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(Brush.linearGradient(listOf(PulseBlue, PulsePurple))),
                     contentAlignment = Alignment.Center
@@ -101,21 +111,21 @@ fun StudyPulseTopBar(
                         imageVector = Icons.Rounded.Bolt,
                         contentDescription = "Study Pulse brand emblem",
                         tint = Color.White,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(21.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Text(
                             text = stringResource(R.string.brand_title),
                             style = TextStyle(
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontWeight = FontWeight.ExtraBold,
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 brush = Brush.horizontalGradient(listOf(PulseBlueLight, PulsePurpleLight))
                             ),
                             maxLines = 1,
@@ -130,7 +140,7 @@ fun StudyPulseTopBar(
                                 text = "Prince",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = PulseGold,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
                     }
@@ -146,7 +156,7 @@ fun StudyPulseTopBar(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Surface(
                     shape = CircleShape,
@@ -154,9 +164,9 @@ fun StudyPulseTopBar(
                     border = BorderStroke(1.dp, PulseAmber.copy(alpha = 0.35f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.LocalFireDepartment,
@@ -183,7 +193,7 @@ fun StudyPulseTopBar(
                         .clickable(onClick = onTestAlarmClick)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
@@ -200,9 +210,129 @@ fun StudyPulseTopBar(
                         )
                     }
                 }
+
+                Surface(
+                    shape = CircleShape,
+                    color = PulseBlue.copy(alpha = 0.18f),
+                    border = BorderStroke(1.dp, PulseBlue.copy(alpha = 0.42f)),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .testTag("account_menu_button")
+                        .clickable(onClick = onAccountClick)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.AccountCircle,
+                            contentDescription = "Student Account & Sign Out",
+                            tint = PulseBlueSoft,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+fun AccountProfileDialog(
+    displayName: String,
+    email: String?,
+    streamLabel: String,
+    onSignOut: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MidnightSurface,
+        titleContentColor = TextPrimary,
+        textContentColor = TextSecondary,
+        icon = {
+            Icon(
+                imageVector = Icons.Rounded.AccountCircle,
+                contentDescription = null,
+                tint = PulseBlueLight,
+                modifier = Modifier.size(36.dp)
+            )
+        },
+        title = {
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (!email.isNullOrBlank()) {
+                    Text(
+                        text = email,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMuted
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = PulseEmerald.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, PulseEmerald.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.CloudDone,
+                            contentDescription = null,
+                            tint = PulseEmerald,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Column {
+                            Text(
+                                text = "Cloud Backup Active",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = PulseEmerald
+                            )
+                            Text(
+                                text = "Active Batch: $streamLabel",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onSignOut,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PulseRose.copy(alpha = 0.22f),
+                    contentColor = Color(0xFFFDA4AF)
+                ),
+                border = BorderStroke(1.dp, PulseRose.copy(alpha = 0.5f)),
+                modifier = Modifier.testTag("dialog_sign_out_button")
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.Logout,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Sign Out", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = TextSecondary)
+            }
+        }
+    )
 }
 
 @Composable

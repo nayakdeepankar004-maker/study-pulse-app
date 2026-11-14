@@ -1,0 +1,230 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated student profile and Study Pulse daily targets, streak, stream, and alarm preferences.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owning student."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Student display name from Google Sign-In or profile setup."
+        },
+        "email": {
+          "type": "string",
+          "description": "Student email address (private to owner)."
+        },
+        "selectedStream": {
+          "type": "string",
+          "enum": ["10th", "11th", "12th", "NEET", "JEE"],
+          "description": "Active exam/class batch."
+        },
+        "selectedSubjectFilter": {
+          "type": "string",
+          "description": "Active subject filter or ALL."
+        },
+        "dailyTargetLectures": {
+          "type": "integer",
+          "description": "Daily target number of lectures/sessions (1..20)."
+        },
+        "dailyTargetHours": {
+          "type": "integer",
+          "description": "Daily target self-study hours (1..18)."
+        },
+        "loggedHoursToday": {
+          "type": "number",
+          "description": "Self-study hours logged today (0..24)."
+        },
+        "streak": {
+          "type": "integer",
+          "description": "Consecutive study days streak."
+        },
+        "alarmTone": {
+          "type": "string",
+          "enum": ["neon", "cyber", "urgent"],
+          "description": "Preferred synthesized alarm sound."
+        },
+        "lastLoggedDate": {
+          "type": "string",
+          "description": "YYYY-MM-DD date of last logged hours."
+        },
+        "isSeeded": {
+          "type": "boolean",
+          "description": "Whether starter study tasks and goals have been seeded."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "selectedStream",
+        "selectedSubjectFilter",
+        "dailyTargetLectures",
+        "dailyTargetHours",
+        "loggedHoursToday",
+        "streak",
+        "alarmTone",
+        "lastLoggedDate",
+        "isSeeded",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudyTask": {
+      "title": "StudyTask",
+      "description": "A scheduled chapter lecture or study alarm for a user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owning student."
+        },
+        "title": {
+          "type": "string",
+          "description": "Chapter or lecture name."
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject name."
+        },
+        "date": {
+          "type": "string",
+          "description": "Scheduled date in YYYY-MM-DD format."
+        },
+        "time": {
+          "type": "string",
+          "description": "Scheduled alarm time in HH:mm 24-hour format."
+        },
+        "repeatCode": {
+          "type": "string",
+          "enum": ["once", "daily"],
+          "description": "Repeat schedule."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional study notes."
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Whether the task is completed."
+        },
+        "celebrated": {
+          "type": "boolean",
+          "description": "Whether the one-time completion celebration has fired."
+        },
+        "firedKey": {
+          "type": "string",
+          "description": "Deduplication key YYYY-MM-DD_HH:mm when alarm fired."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "subject",
+        "date",
+        "time",
+        "repeatCode",
+        "notes",
+        "completed",
+        "celebrated",
+        "firedKey",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChapterGoal": {
+      "title": "ChapterGoal",
+      "description": "A multi-day chapter revision or practice goal for a user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owning student."
+        },
+        "title": {
+          "type": "string",
+          "description": "Chapter goal title."
+        },
+        "spanLabel": {
+          "type": "string",
+          "enum": ["Today", "Tomorrow", "Next 2 Days", "Next 7 Days"],
+          "description": "Target timeframe."
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject name."
+        },
+        "done": {
+          "type": "boolean",
+          "description": "Whether the goal is completed."
+        },
+        "celebrated": {
+          "type": "boolean",
+          "description": "Whether the one-time completion celebration has fired."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "spanLabel",
+        "subject",
+        "done",
+        "celebrated",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Private user profile, stream selection, daily targets, streak, and preferences."
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": {
+        "$ref": "#/entities/StudyTask"
+      },
+      "description": "User-owned study alarms and lecture tasks."
+    },
+    "/users/{userId}/goals/{goalId}": {
+      "schema": {
+        "$ref": "#/entities/ChapterGoal"
+      },
+      "description": "User-owned multi-day chapter goals."
+    }
+  }
+}

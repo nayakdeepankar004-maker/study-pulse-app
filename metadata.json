@@ -1,0 +1,6 @@
+{
+  "name": "Study Pulse",
+  "description": "All-in-one exam planner, chapter goal tracker, and smart study alarm app for 10th, 11th, 12th, NEET, and JEE students.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

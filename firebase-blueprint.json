@@ -2,7 +2,7 @@
   "entities": {
     "UserProfile": {
       "title": "UserProfile",
-      "description": "Authenticated student profile and Study Pulse daily targets, streak, stream, and alarm preferences.",
+      "description": "Authenticated student profile, academic board/class/stream onboarding preferences, and exam progress stats.",
       "type": "object",
       "properties": {
         "userId": {
@@ -11,80 +11,77 @@
         },
         "displayName": {
           "type": "string",
-          "description": "Student display name from Google Sign-In or profile setup."
+          "description": "Student display name."
         },
         "email": {
           "type": "string",
-          "description": "Student email address (private to owner)."
+          "description": "Private student email address."
         },
-        "selectedStream": {
+        "board": {
           "type": "string",
-          "enum": ["10th", "11th", "12th", "NEET", "JEE"],
-          "description": "Active exam/class batch."
+          "enum": ["CBSE", "ICSE", "BSE Odisha", "Other State Boards"],
+          "description": "Selected education board."
         },
-        "selectedSubjectFilter": {
+        "studentClass": {
           "type": "string",
-          "description": "Active subject filter or ALL."
+          "enum": ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"],
+          "description": "Selected grade/class."
         },
-        "dailyTargetLectures": {
-          "type": "integer",
-          "description": "Daily target number of lectures/sessions (1..20)."
-        },
-        "dailyTargetHours": {
-          "type": "integer",
-          "description": "Daily target self-study hours (1..18)."
-        },
-        "loggedHoursToday": {
-          "type": "number",
-          "description": "Self-study hours logged today (0..24)."
-        },
-        "streak": {
-          "type": "integer",
-          "description": "Consecutive study days streak."
-        },
-        "alarmTone": {
+        "stream": {
           "type": "string",
-          "enum": ["neon", "cyber", "urgent"],
-          "description": "Preferred synthesized alarm sound."
+          "enum": ["Science PCM", "Science PCB", "Commerce", "Arts/Humanities", "Foundation"],
+          "description": "Academic stream."
         },
-        "lastLoggedDate": {
+        "targetExam": {
           "type": "string",
-          "description": "YYYY-MM-DD date of last logged hours."
+          "enum": ["Board Exams", "NEET", "JEE Main", "Foundation"],
+          "description": "Primary target exam track."
         },
-        "isSeeded": {
+        "onboardingCompleted": {
           "type": "boolean",
-          "description": "Whether starter study tasks and goals have been seeded."
+          "description": "Whether onboarding setup has been completed."
+        },
+        "totalTestsTaken": {
+          "type": "integer",
+          "description": "Total completed practice/mock tests."
+        },
+        "bestAccuracy": {
+          "type": "integer",
+          "description": "Highest quiz accuracy percentage (0..100)."
+        },
+        "streakDays": {
+          "type": "integer",
+          "description": "Active study streak in days."
         },
         "createdAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
         },
         "updatedAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
         }
       },
       "required": [
         "userId",
         "displayName",
-        "selectedStream",
-        "selectedSubjectFilter",
-        "dailyTargetLectures",
-        "dailyTargetHours",
-        "loggedHoursToday",
-        "streak",
-        "alarmTone",
-        "lastLoggedDate",
-        "isSeeded",
+        "board",
+        "studentClass",
+        "stream",
+        "targetExam",
+        "onboardingCompleted",
+        "totalTestsTaken",
+        "bestAccuracy",
+        "streakDays",
         "createdAt",
         "updatedAt"
       ]
     },
-    "StudyTask": {
-      "title": "StudyTask",
-      "description": "A scheduled chapter lecture or study alarm for a user.",
+    "StudyNote": {
+      "title": "StudyNote",
+      "description": "User-authored study notes, formula sheets, and AI-summarized revisions.",
       "type": "object",
       "properties": {
         "userId": {
@@ -93,70 +90,44 @@
         },
         "title": {
           "type": "string",
-          "description": "Chapter or lecture name."
+          "description": "Note title."
         },
         "subject": {
           "type": "string",
-          "description": "Subject name."
+          "description": "Subject tag."
         },
-        "date": {
+        "content": {
           "type": "string",
-          "description": "Scheduled date in YYYY-MM-DD format."
+          "description": "Note body text."
         },
-        "time": {
-          "type": "string",
-          "description": "Scheduled alarm time in HH:mm 24-hour format."
-        },
-        "repeatCode": {
-          "type": "string",
-          "enum": ["once", "daily"],
-          "description": "Repeat schedule."
-        },
-        "notes": {
-          "type": "string",
-          "description": "Optional study notes."
-        },
-        "completed": {
+        "pinned": {
           "type": "boolean",
-          "description": "Whether the task is completed."
-        },
-        "celebrated": {
-          "type": "boolean",
-          "description": "Whether the one-time completion celebration has fired."
-        },
-        "firedKey": {
-          "type": "string",
-          "description": "Deduplication key YYYY-MM-DD_HH:mm when alarm fired."
+          "description": "Whether note is pinned to top."
         },
         "createdAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
         },
         "updatedAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
         }
       },
       "required": [
         "userId",
         "title",
         "subject",
-        "date",
-        "time",
-        "repeatCode",
-        "notes",
-        "completed",
-        "celebrated",
-        "firedKey",
+        "content",
+        "pinned",
         "createdAt",
         "updatedAt"
       ]
     },
-    "ChapterGoal": {
-      "title": "ChapterGoal",
-      "description": "A multi-day chapter revision or practice goal for a user.",
+    "PdfDocumentMeta": {
+      "title": "PdfDocumentMeta",
+      "description": "Metadata and SAF content URI reference for a student's study PDF.",
       "type": "object",
       "properties": {
         "userId": {
@@ -165,43 +136,109 @@
         },
         "title": {
           "type": "string",
-          "description": "Chapter goal title."
-        },
-        "spanLabel": {
-          "type": "string",
-          "enum": ["Today", "Tomorrow", "Next 2 Days", "Next 7 Days"],
-          "description": "Target timeframe."
+          "description": "Display title of the PDF."
         },
         "subject": {
           "type": "string",
-          "description": "Subject name."
+          "description": "Subject category."
         },
-        "done": {
-          "type": "boolean",
-          "description": "Whether the goal is completed."
+        "uriString": {
+          "type": "string",
+          "description": "Persistable SAF URI string on device."
         },
-        "celebrated": {
-          "type": "boolean",
-          "description": "Whether the one-time completion celebration has fired."
+        "pageCount": {
+          "type": "integer",
+          "description": "Number of pages in the PDF."
         },
         "createdAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
         },
         "updatedAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
         }
       },
       "required": [
         "userId",
         "title",
-        "spanLabel",
         "subject",
-        "done",
-        "celebrated",
+        "uriString",
+        "pageCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "TestAttempt": {
+      "title": "TestAttempt",
+      "description": "Completed practice quiz or mock exam result.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owning student."
+        },
+        "title": {
+          "type": "string",
+          "description": "Quiz or mock test title."
+        },
+        "track": {
+          "type": "string",
+          "enum": ["Board Exams", "NEET", "JEE Main", "Foundation", "AI Generated"],
+          "description": "Exam track."
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject tested."
+        },
+        "totalQuestions": {
+          "type": "integer",
+          "description": "Total questions in test."
+        },
+        "correctCount": {
+          "type": "integer",
+          "description": "Correctly answered questions."
+        },
+        "score": {
+          "type": "integer",
+          "description": "Score achieved."
+        },
+        "maxScore": {
+          "type": "integer",
+          "description": "Maximum possible score."
+        },
+        "accuracyPercent": {
+          "type": "integer",
+          "description": "Accuracy percentage (0..100)."
+        },
+        "durationSeconds": {
+          "type": "integer",
+          "description": "Time spent in seconds."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "track",
+        "subject",
+        "totalQuestions",
+        "correctCount",
+        "score",
+        "maxScore",
+        "accuracyPercent",
+        "durationSeconds",
         "createdAt",
         "updatedAt"
       ]
@@ -212,19 +249,25 @@
       "schema": {
         "$ref": "#/entities/UserProfile"
       },
-      "description": "Private user profile, stream selection, daily targets, streak, and preferences."
+      "description": "Private student profile, academic setup, and aggregate quiz metrics."
     },
-    "/users/{userId}/tasks/{taskId}": {
+    "/users/{userId}/notes/{noteId}": {
       "schema": {
-        "$ref": "#/entities/StudyTask"
+        "$ref": "#/entities/StudyNote"
       },
-      "description": "User-owned study alarms and lecture tasks."
+      "description": "Student-owned study notes."
     },
-    "/users/{userId}/goals/{goalId}": {
+    "/users/{userId}/pdfs/{pdfId}": {
       "schema": {
-        "$ref": "#/entities/ChapterGoal"
+        "$ref": "#/entities/PdfDocumentMeta"
       },
-      "description": "User-owned multi-day chapter goals."
+      "description": "Student-owned PDF library metadata."
+    },
+    "/users/{userId}/testAttempts/{attemptId}": {
+      "schema": {
+        "$ref": "#/entities/TestAttempt"
+      },
+      "description": "Student-owned practice & mock test history."
     }
   }
 }

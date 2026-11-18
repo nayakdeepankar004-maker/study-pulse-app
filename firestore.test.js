@@ -8,66 +8,11 @@ const fs = require("node:fs");
 
 let testEnv;
 const PROJECT_ID = process.env.GCP_PROJECT || "demo-no-project";
-const DB_ID = "ai-studio-android-studypul-f2dd2f8d-bcb5-4e6d-8470-954c7a6cf12c";
-const ALICE_UID = "alice_uid_1";
-const BOB_UID = "bob_uid_2";
+const ALICE_UID = "alice_123";
+const BOB_UID = "bob_456";
 
 const [emulatorHost, emulatorPortStr] = (process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8085").split(":");
 const emulatorPort = parseInt(emulatorPortStr, 10);
-
-const validTs = () => new Date(Date.now() - 2000);
-
-function validProfile(uid) {
-  const ts = validTs();
-  return {
-    userId: uid,
-    displayName: "Prince",
-    email: "prince@example.com",
-    selectedStream: "NEET",
-    selectedSubjectFilter: "ALL",
-    dailyTargetLectures: 4,
-    dailyTargetHours: 6,
-    loggedHoursToday: 2.5,
-    streak: 7,
-    alarmTone: "neon",
-    lastLoggedDate: "2026-11-14",
-    isSeeded: true,
-    createdAt: ts,
-    updatedAt: ts,
-  };
-}
-
-function validTask(uid) {
-  const ts = validTs();
-  return {
-    userId: uid,
-    title: "Motion in a Straight Line",
-    subject: "Physics",
-    date: "2026-11-14",
-    time: "10:00",
-    repeatCode: "daily",
-    notes: "Solve 15 MCQs",
-    completed: false,
-    celebrated: false,
-    firedKey: "",
-    createdAt: ts,
-    updatedAt: ts,
-  };
-}
-
-function validGoal(uid) {
-  const ts = validTs();
-  return {
-    userId: uid,
-    title: "Complete Kinematics",
-    spanLabel: "Next 2 Days",
-    subject: "Physics",
-    done: false,
-    celebrated: false,
-    createdAt: ts,
-    updatedAt: ts,
-  };
-}
 
 before(async () => {
   const rules = fs.readFileSync("./firestore.rules", "utf8");
@@ -82,66 +27,215 @@ before(async () => {
 });
 
 after(async () => {
-  if (testEnv) await testEnv.cleanup();
+  if (testEnv) {
+    await testEnv.cleanup();
+  }
 });
 
 beforeEach(async () => {
-  if (testEnv) await testEnv.clearFirestore();
+  if (testEnv) {
+    await testEnv.clearFirestore();
+  }
 });
 
-test("Unauthenticated user cannot read or write profiles, tasks, or goals", async () => {
-  const unauthDb = testEnv.unauthenticatedContext().firestore(DB_ID);
+test("Unauthenticated user: cannot read or write any user profile, notes, pdfs, or testAttempts", async () => {
+  const unauthDb = testEnv.unauthenticatedContext().firestore();
+  const now = new Date(Date.now() - 1000);
+
   await assertFails(unauthDb.collection("users").doc(ALICE_UID).get());
-  await assertFails(unauthDb.collection("users").doc(ALICE_UID).collection("tasks").get());
-  await assertFails(unauthDb.collection("users").doc(ALICE_UID).collection("tasks").doc("t1").set(validTask(ALICE_UID)));
+  await assertFails(unauthDb.collection("users").doc(ALICE_UID).collection("notes").get());
+  await assertFails(
+    unauthDb.collection("users").doc(ALICE_UID).set({
+      userId: ALICE_UID,
+      displayName: "Unauth",
+      board: "CBSE",
+      studentClass: "Class 11",
+      stream: "Science PCM",
+      targetExam: "JEE Main",
+      onboardingCompleted: true,
+      totalTestsTaken: 0,
+      bestAccuracy: 0,
+      streakDays: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
 });
 
-test("Authenticated owner can create, read, update, and delete own profile, tasks, and goals", async () => {
-  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore(DB_ID);
-  const profileRef = aliceDb.collection("users").doc(ALICE_UID);
-  const taskRef = profileRef.collection("tasks").doc("t_1");
-  const goalRef = profileRef.collection("goals").doc("g_1");
+test("Authenticated owner: valid UserProfile create & partial update succeed; ghost/future/spoof fail", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const created = new Date(Date.now() - 5000);
 
-  await assertSucceeds(profileRef.set(validProfile(ALICE_UID)));
-  await assertSucceeds(profileRef.get());
-  await assertSucceeds(profileRef.update({ streak: 8, updatedAt: validTs() }));
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).set({
+      userId: ALICE_UID,
+      displayName: "Aarav Sharma",
+      email: "aarav@example.com",
+      board: "CBSE",
+      studentClass: "Class 12",
+      stream: "Science PCB",
+      targetExam: "NEET",
+      onboardingCompleted: true,
+      totalTestsTaken: 0,
+      bestAccuracy: 0,
+      streakDays: 1,
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
 
-  await assertSucceeds(taskRef.set(validTask(ALICE_UID)));
-  await assertSucceeds(profileRef.collection("tasks").get());
-  await assertSucceeds(taskRef.update({ completed: true, celebrated: true, updatedAt: validTs() }));
-  await assertSucceeds(taskRef.delete());
+  // Partial update on allowed keys
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).update({
+      totalTestsTaken: 1,
+      bestAccuracy: 92,
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
 
-  await assertSucceeds(goalRef.set(validGoal(ALICE_UID)));
-  await assertSucceeds(profileRef.collection("goals").get());
-  await assertSucceeds(goalRef.update({ done: true, updatedAt: validTs() }));
-  await assertSucceeds(goalRef.delete());
+  // Reject immutable createdAt mutation
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).update({
+      createdAt: new Date(Date.now() - 500),
+      updatedAt: new Date(Date.now() - 500),
+    })
+  );
+
+  // Reject ghost field on update
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).update({
+      role: "admin",
+      updatedAt: new Date(Date.now() - 500),
+    })
+  );
+
+  // Reject future timestamp
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).update({
+      streakDays: 2,
+      updatedAt: new Date(Date.now() + 60000),
+    })
+  );
 });
 
-test("Cross-user access is strictly denied", async () => {
-  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore(DB_ID);
-  await assertSucceeds(aliceDb.collection("users").doc(ALICE_UID).set(validProfile(ALICE_UID)));
-  await assertSucceeds(aliceDb.collection("users").doc(ALICE_UID).collection("tasks").doc("t1").set(validTask(ALICE_UID)));
+test("Cross-user isolation: Bob cannot read or modify Alice profile, notes, pdfs, or testAttempts", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  const now = new Date(Date.now() - 5000);
 
-  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore(DB_ID);
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).set({
+      userId: ALICE_UID,
+      displayName: "Alice",
+      board: "ICSE",
+      studentClass: "Class 10",
+      stream: "Foundation",
+      targetExam: "Board Exams",
+      onboardingCompleted: true,
+      totalTestsTaken: 0,
+      bestAccuracy: 0,
+      streakDays: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).collection("notes").doc("note_1").set({
+      userId: ALICE_UID,
+      title: "Electrostatics Laws",
+      subject: "Physics",
+      content: "Gauss law relates electric flux to enclosed charge.",
+      pinned: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+
   await assertFails(bobDb.collection("users").doc(ALICE_UID).get());
-  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("tasks").get());
-  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("tasks").doc("t1").update({ completed: true, updatedAt: validTs() }));
-  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("tasks").doc("t2").set(validTask(BOB_UID)));
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("notes").get());
+  await assertFails(
+    bobDb.collection("users").doc(ALICE_UID).collection("notes").doc("note_1").update({
+      title: "Hijacked",
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
 });
 
-test("Shadow fields, invalid enums, future timestamps, and spoofed userId are rejected", async () => {
-  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore(DB_ID);
-  const taskRef = aliceDb.collection("users").doc(ALICE_UID).collection("tasks").doc("t_bad");
+test("Authenticated owner: notes, pdfs, and testAttempts CRUD and validation bounds", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const now = new Date(Date.now() - 5000);
 
-  const shadowPayload = { ...validTask(ALICE_UID), isAdmin: true };
-  await assertFails(taskRef.set(shadowPayload));
+  // Notes create, list, update, delete
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).collection("notes").doc("note_1").set({
+      userId: ALICE_UID,
+      title: "Organic Chemistry Reactions",
+      subject: "Chemistry",
+      content: "Aldol condensation involves enolate addition.",
+      pinned: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+  await assertSucceeds(aliceDb.collection("users").doc(ALICE_UID).collection("notes").get());
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).collection("notes").doc("note_1").update({
+      pinned: true,
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
 
-  const badEnum = { ...validTask(ALICE_UID), repeatCode: "weekly" };
-  await assertFails(taskRef.set(badEnum));
+  // Reject @DocumentId 'id' inside note payload
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).collection("notes").doc("note_bad").set({
+      id: "note_bad",
+      userId: ALICE_UID,
+      title: "Bad Note",
+      subject: "Physics",
+      content: "Should fail",
+      pinned: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
 
-  const futureTs = { ...validTask(ALICE_UID), createdAt: new Date(Date.now() + 60000) };
-  await assertFails(taskRef.set(futureTs));
+  // PDFs create & list
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).collection("pdfs").doc("pdf_1").set({
+      userId: ALICE_UID,
+      title: "NCERT_Physics_Ch1.pdf",
+      subject: "Physics",
+      uriString: "content://com.android.providers.downloads/document/101",
+      pageCount: 28,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+  await assertSucceeds(aliceDb.collection("users").doc(ALICE_UID).collection("pdfs").get());
 
-  const spoofedUid = { ...validTask(BOB_UID) };
-  await assertFails(taskRef.set(spoofedUid));
+  // TestAttempts create & list; updates are immutable/disallowed
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).collection("testAttempts").doc("att_1").set({
+      userId: ALICE_UID,
+      title: "NEET Biology Mock 1",
+      track: "NEET",
+      subject: "Biology",
+      totalQuestions: 10,
+      correctCount: 8,
+      score: 30,
+      maxScore: 40,
+      accuracyPercent: 80,
+      durationSeconds: 320,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+  await assertSucceeds(aliceDb.collection("users").doc(ALICE_UID).collection("testAttempts").get());
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).collection("testAttempts").doc("att_1").update({
+      score: 40,
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
 });

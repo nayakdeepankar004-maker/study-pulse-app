@@ -1,7 +1,6 @@
 <resources>
-    <string name="app_name">Study Pulse</string>
-    <string name="brand_title">STUDY PULSE</string>
-    <string name="brand_badge">By Prince</string>
-    <string name="credits_title">Designed &amp; Developed by Prince</string>
-    <string name="credits_subtitle">STUDY PULSE – All-in-One Exam Planner (10th • 11th • 12th • NEET • JEE)</string>
+    <string name="app_name">JeetXToppers</string>
+    <string name="brand_title">JeetXToppers</string>
+    <string name="brand_tagline">LEARN • PRACTICE • ACHIEVE</string>
+    <string name="credits_title">Developer: Prince</string>
 </resources>

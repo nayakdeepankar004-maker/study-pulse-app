@@ -1,4 +1,4 @@
-name: Build Study Pulse APK
+name: Build JeetXToppers APK
 
 on:
   push:
@@ -44,33 +44,34 @@ jobs:
             fi
           fi
 
-      - name: Restore google-services.json
+      - name: Ensure google-services.json exists
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
-            echo "::error::Missing GOOGLE_SERVICES_JSON secret. Add it in Repo Settings > Secrets and variables > Actions."
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s\n' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          elif [ ! -f app/google-services.json ]; then
+            echo "::error::Missing app/google-services.json and GOOGLE_SERVICES_JSON secret."
             exit 1
           fi
-          printf '%s\n' "$GOOGLE_SERVICES_JSON" > app/google-services.json
 
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon
 
-      - name: Prepare Study-Pulse.apk
-        run: cp app/build/outputs/apk/debug/app-debug.apk Study-Pulse.apk
+      - name: Prepare JeetXToppers.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk JeetXToppers.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Study-Pulse-APK
-          path: Study-Pulse.apk
+          name: JeetXToppers-APK
+          path: JeetXToppers.apk
 
       - name: Publish direct APK to Releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete latest --yes || true
-          gh release create latest Study-Pulse.apk \
-            --title "Study Pulse APK" \
-            --notes "Direct Android APK download for Study Pulse."
+          gh release create latest JeetXToppers.apk \
+            --title "JeetXToppers APK" \
+            --notes "Direct Android APK download for JeetXToppers."

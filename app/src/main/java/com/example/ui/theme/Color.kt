@@ -2,36 +2,33 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Pulse Midnight Neon Palette
-val MidnightBg = Color(0xFF070B19)
-val MidnightHeader = Color(0xFF0B0F1D)
-val MidnightSurface = Color(0xFF111827)
-val MidnightSurfaceHigh = Color(0xFF1E293B)
-val MidnightInputBg = Color(0xFF0B1120)
+// JeetXToppers Brand Tokens
+val IndigoPrimary = Color(0xFF4F46E5)
+val IndigoPrimaryHover = Color(0xFF4338CA)
+val IndigoLight = Color(0xFF6366F1)
+val IndigoSoft = Color(0xFFE0E7FF)
 
-val PulseBlue = Color(0xFF3B82F6)
-val PulseBlueLight = Color(0xFF60A5FA)
-val PulseBlueSoft = Color(0xFF93C5FD)
+val EmeraldSecondary = Color(0xFF10B981)
+val EmeraldSoft = Color(0xFFD1FAE5)
 
-val PulsePurple = Color(0xFF8B5CF6)
-val PulsePurpleLight = Color(0xFFC084FC)
-val PulsePurpleSoft = Color(0xFFDDD6FE)
+val RoseDanger = Color(0xFFEF4444)
+val RoseSoft = Color(0xFFFEE2E2)
 
-val PulseEmerald = Color(0xFF10B981)
-val PulseEmeraldLight = Color(0xFF34D399)
-val PulseEmeraldDark = Color(0xFF052E16)
+val AmberAccent = Color(0xFFF59E0B)
+val AmberSoft = Color(0xFFFEF3C7)
 
-val PulseAmber = Color(0xFFF59E0B)
-val PulseAmberLight = Color(0xFFFBBF24)
-val PulseGold = Color(0xFFFCD34D)
+// Light Surface Tokens
+val LightBackground = Color(0xFFF9FAFB)
+val LightSurface = Color(0xFFFFFFFF)
+val LightSurfaceVariant = Color(0xFFF3F4F6)
+val LightTextMain = Color(0xFF111827)
+val LightTextMuted = Color(0xFF6B7280)
+val LightBorder = Color(0xFFE5E7EB)
 
-val PulseRose = Color(0xFFF43F5E)
-val PulseRoseLight = Color(0xFFFDA4AF)
-
-val TextPrimary = Color(0xFFF8FAFC)
-val TextSecondary = Color(0xFFCBD5E1)
-val TextMuted = Color(0xFF94A3B8)
-
-val CardBorderBlue = Color(0x383B82F6)
-val CardBorderSubtle = Color(0x14FFFFFF)
-val CardBorderDone = Color(0x5910B981)
+// Dark Surface Tokens
+val DarkBackground = Color(0xFF0F172A)
+val DarkSurface = Color(0xFF1E293B)
+val DarkSurfaceVariant = Color(0xFF334155)
+val DarkTextMain = Color(0xFFF8FAFC)
+val DarkTextMuted = Color(0xFF94A3B8)
+val DarkBorder = Color(0xFF334155)

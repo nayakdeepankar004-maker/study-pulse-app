@@ -30,37 +30,43 @@ service cloud.firestore {
       return data.userId is string && data.userId == expectedUid &&
              data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
              (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 200)) &&
-             data.selectedStream in ['10th', '11th', '12th', 'NEET', 'JEE'] &&
-             data.selectedSubjectFilter is string && data.selectedSubjectFilter.size() >= 1 && data.selectedSubjectFilter.size() <= 60 &&
-             data.dailyTargetLectures is int && data.dailyTargetLectures >= 1 && data.dailyTargetLectures <= 20 &&
-             data.dailyTargetHours is int && data.dailyTargetHours >= 1 && data.dailyTargetHours <= 18 &&
-             data.loggedHoursToday is number && data.loggedHoursToday >= 0 && data.loggedHoursToday <= 24 &&
-             data.streak is int && data.streak >= 0 && data.streak <= 10000 &&
-             data.alarmTone in ['neon', 'cyber', 'urgent'] &&
-             data.lastLoggedDate is string && data.lastLoggedDate.size() >= 8 && data.lastLoggedDate.size() <= 20 &&
-             data.isSeeded is bool;
+             data.board in ['CBSE', 'ICSE', 'BSE Odisha', 'Other State Boards'] &&
+             data.studentClass in ['Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'] &&
+             data.stream in ['Science PCM', 'Science PCB', 'Commerce', 'Arts/Humanities', 'Foundation'] &&
+             data.targetExam in ['Board Exams', 'NEET', 'JEE Main', 'Foundation'] &&
+             data.onboardingCompleted is bool &&
+             data.totalTestsTaken is int && data.totalTestsTaken >= 0 && data.totalTestsTaken <= 100000 &&
+             data.bestAccuracy is int && data.bestAccuracy >= 0 && data.bestAccuracy <= 100 &&
+             data.streakDays is int && data.streakDays >= 0 && data.streakDays <= 10000;
     }
 
-    function isValidStudyTask(data, expectedUid) {
+    function isValidStudyNote(data, expectedUid) {
+      return data.userId is string && data.userId == expectedUid &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+             data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60 &&
+             data.content is string && data.content.size() <= 10000 &&
+             data.pinned is bool;
+    }
+
+    function isValidPdfDocument(data, expectedUid) {
       return data.userId is string && data.userId == expectedUid &&
              data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
              data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60 &&
-             data.date is string && data.date.size() >= 8 && data.date.size() <= 20 &&
-             data.time is string && data.time.size() >= 4 && data.time.size() <= 10 &&
-             data.repeatCode in ['once', 'daily'] &&
-             data.notes is string && data.notes.size() <= 500 &&
-             data.completed is bool &&
-             data.celebrated is bool &&
-             data.firedKey is string && data.firedKey.size() <= 30;
+             data.uriString is string && data.uriString.size() >= 1 && data.uriString.size() <= 1000 &&
+             data.pageCount is int && data.pageCount >= 0 && data.pageCount <= 50000;
     }
 
-    function isValidChapterGoal(data, expectedUid) {
+    function isValidTestAttempt(data, expectedUid) {
       return data.userId is string && data.userId == expectedUid &&
-             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
-             data.spanLabel in ['Today', 'Tomorrow', 'Next 2 Days', 'Next 7 Days'] &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+             data.track in ['Board Exams', 'NEET', 'JEE Main', 'Foundation', 'AI Generated'] &&
              data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 60 &&
-             data.done is bool &&
-             data.celebrated is bool;
+             data.totalQuestions is int && data.totalQuestions >= 1 && data.totalQuestions <= 200 &&
+             data.correctCount is int && data.correctCount >= 0 && data.correctCount <= data.totalQuestions &&
+             data.score is int && data.score >= -200 && data.score <= 800 &&
+             data.maxScore is int && data.maxScore >= 1 && data.maxScore <= 800 &&
+             data.accuracyPercent is int && data.accuracyPercent >= 0 && data.accuracyPercent <= 100 &&
+             data.durationSeconds is int && data.durationSeconds >= 0 && data.durationSeconds <= 86400;
     }
 
     match /users/{userId} {
@@ -70,16 +76,14 @@ service cloud.firestore {
       allow create: if isOwner(userId) &&
                        isValidId(userId) &&
                        incoming().keys().hasAll([
-                         'userId', 'displayName', 'selectedStream', 'selectedSubjectFilter',
-                         'dailyTargetLectures', 'dailyTargetHours', 'loggedHoursToday',
-                         'streak', 'alarmTone', 'lastLoggedDate', 'isSeeded',
-                         'createdAt', 'updatedAt'
+                         'userId', 'displayName', 'board', 'studentClass', 'stream',
+                         'targetExam', 'onboardingCompleted', 'totalTestsTaken',
+                         'bestAccuracy', 'streakDays', 'createdAt', 'updatedAt'
                        ]) &&
                        incoming().keys().hasOnly([
-                         'userId', 'displayName', 'email', 'selectedStream', 'selectedSubjectFilter',
-                         'dailyTargetLectures', 'dailyTargetHours', 'loggedHoursToday',
-                         'streak', 'alarmTone', 'lastLoggedDate', 'isSeeded',
-                         'createdAt', 'updatedAt'
+                         'userId', 'displayName', 'email', 'board', 'studentClass', 'stream',
+                         'targetExam', 'onboardingCompleted', 'totalTestsTaken',
+                         'bestAccuracy', 'streakDays', 'createdAt', 'updatedAt'
                        ]) &&
                        incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
                        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
@@ -92,74 +96,98 @@ service cloud.firestore {
                        incoming().createdAt == existing().createdAt &&
                        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
                        incoming().diff(existing()).affectedKeys().hasOnly([
-                         'displayName', 'email', 'selectedStream', 'selectedSubjectFilter',
-                         'dailyTargetLectures', 'dailyTargetHours', 'loggedHoursToday',
-                         'streak', 'alarmTone', 'lastLoggedDate', 'isSeeded', 'updatedAt'
+                         'displayName', 'email', 'board', 'studentClass', 'stream',
+                         'targetExam', 'onboardingCompleted', 'totalTestsTaken',
+                         'bestAccuracy', 'streakDays', 'updatedAt'
                        ]);
 
       allow delete: if isOwner(userId) && isValidId(userId);
 
-      match /tasks/{taskId} {
-        allow get: if isOwner(userId) && isValidId(taskId);
+      match /notes/{noteId} {
+        allow get: if isOwner(userId) && isValidId(noteId);
         allow list: if isOwner(userId);
 
         allow create: if isOwner(userId) &&
-                         isValidId(taskId) &&
+                         isValidId(noteId) &&
                          incoming().keys().hasAll([
-                           'userId', 'title', 'subject', 'date', 'time', 'repeatCode',
-                           'notes', 'completed', 'celebrated', 'firedKey', 'createdAt', 'updatedAt'
+                           'userId', 'title', 'subject', 'content', 'pinned',
+                           'createdAt', 'updatedAt'
                          ]) &&
                          incoming().keys().hasOnly([
-                           'userId', 'title', 'subject', 'date', 'time', 'repeatCode',
-                           'notes', 'completed', 'celebrated', 'firedKey', 'createdAt', 'updatedAt'
+                           'userId', 'title', 'subject', 'content', 'pinned',
+                           'createdAt', 'updatedAt'
                          ]) &&
                          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
                          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-                         isValidStudyTask(incoming(), userId);
+                         isValidStudyNote(incoming(), userId);
 
         allow update: if isOwner(userId) &&
-                         isValidId(taskId) &&
-                         isValidStudyTask(incoming(), userId) &&
+                         isValidId(noteId) &&
+                         isValidStudyNote(incoming(), userId) &&
                          incoming().userId == existing().userId &&
                          incoming().createdAt == existing().createdAt &&
                          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
                          incoming().diff(existing()).affectedKeys().hasOnly([
-                           'title', 'subject', 'date', 'time', 'repeatCode',
-                           'notes', 'completed', 'celebrated', 'firedKey', 'updatedAt'
+                           'title', 'subject', 'content', 'pinned', 'updatedAt'
                          ]);
 
-        allow delete: if isOwner(userId) && isValidId(taskId);
+        allow delete: if isOwner(userId) && isValidId(noteId);
       }
 
-      match /goals/{goalId} {
-        allow get: if isOwner(userId) && isValidId(goalId);
+      match /pdfs/{pdfId} {
+        allow get: if isOwner(userId) && isValidId(pdfId);
         allow list: if isOwner(userId);
 
         allow create: if isOwner(userId) &&
-                         isValidId(goalId) &&
+                         isValidId(pdfId) &&
                          incoming().keys().hasAll([
-                           'userId', 'title', 'spanLabel', 'subject',
-                           'done', 'celebrated', 'createdAt', 'updatedAt'
+                           'userId', 'title', 'subject', 'uriString', 'pageCount',
+                           'createdAt', 'updatedAt'
                          ]) &&
                          incoming().keys().hasOnly([
-                           'userId', 'title', 'spanLabel', 'subject',
-                           'done', 'celebrated', 'createdAt', 'updatedAt'
+                           'userId', 'title', 'subject', 'uriString', 'pageCount',
+                           'createdAt', 'updatedAt'
                          ]) &&
                          incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
                          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
-                         isValidChapterGoal(incoming(), userId);
+                         isValidPdfDocument(incoming(), userId);
 
         allow update: if isOwner(userId) &&
-                         isValidId(goalId) &&
-                         isValidChapterGoal(incoming(), userId) &&
+                         isValidId(pdfId) &&
+                         isValidPdfDocument(incoming(), userId) &&
                          incoming().userId == existing().userId &&
                          incoming().createdAt == existing().createdAt &&
                          incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
                          incoming().diff(existing()).affectedKeys().hasOnly([
-                           'title', 'spanLabel', 'subject', 'done', 'celebrated', 'updatedAt'
+                           'title', 'subject', 'uriString', 'pageCount', 'updatedAt'
                          ]);
 
-        allow delete: if isOwner(userId) && isValidId(goalId);
+        allow delete: if isOwner(userId) && isValidId(pdfId);
+      }
+
+      match /testAttempts/{attemptId} {
+        allow get: if isOwner(userId) && isValidId(attemptId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(attemptId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'title', 'track', 'subject', 'totalQuestions',
+                           'correctCount', 'score', 'maxScore', 'accuracyPercent',
+                           'durationSeconds', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'title', 'track', 'subject', 'totalQuestions',
+                           'correctCount', 'score', 'maxScore', 'accuracyPercent',
+                           'durationSeconds', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         isValidTestAttempt(incoming(), userId);
+
+        allow update: if false;
+
+        allow delete: if isOwner(userId) && isValidId(attemptId);
       }
     }
   }
